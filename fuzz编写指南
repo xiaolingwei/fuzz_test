@@ -1,0 +1,58 @@
+一、	克隆代码仓：
+https://codehub.xfusion.com/FusionOS_test/FusionOS_testcase/system_integration/files?ref=master&filePath=testcases%2Fpackage-test%2FOSS_FUZZ_NEW
+二、代码位置：
+/opt/mugen/testcases/package-test/OSS_FUZZ_NEW
+三、用例模板：
+Fuzz_test后面的三个参数，有些软件包可能不适用，一般默认的话就加这三个参数，
+ 
+
+解释：
+在模糊测试（Fuzzing）中，"address"、"memory" 和 "undefined" 通常与 动态检测工具（如 AddressSanitizer, ASan；MemorySanitizer, MSan；UndefinedBehaviorSanitizer, UBSan） 报告的错误类型相关
+Address（地址相关错误）
+	堆/栈缓冲区溢出（Heap/Stack Buffer Overflow）：访问超出分配内存范围的地址。
+	使用后释放（Use-After-Free, UAF）：释放内存后继续访问。
+	内存泄漏（Memory Leak）：未释放动态分配的内存。
+	重复释放（Double-Free）：多次释放同一内存块。
+Memory（内存初始化相关错误）
+	未初始化内存读取（Use of Uninitialized Memory）：使用了未显式初始化的变量或内存。
+Undefined（未定义行为）
+	整数溢出（Integer Overflow）：如 INT_MAX + 1。
+	类型混淆（Type Confusion）：错误的指针类型转换。
+	空指针解引用（Null Pointer Dereference）。
+	有符号整数溢出（Signed Integer Overflow）。
+	对齐错误（Alignment Violation）：未对齐的内存访问。
+
+
+1、	首先安装docker  rpm-build软件包
+2、	配置daemon.json文件
+ 
+3、# 登录 Docker 仓库
+docker login -u admin -p Harbor12345 70.189.133.99
+3、	拉取容器镜像
+dockers=("base-builder-javascript" "base-builder-go" "base-builder-python" "base-builder-rust" "base-builder-jvm" "base-builder" "base-runner")
+ 
+docker pull 70.189.133.99/oss-fuzz-new/base-builder-go:latest
+改tag:
+docker tag 70.189.133.99/oss-fuzz-new/base-builder-go:latest  gcr.io/oss-fuzz-base/base-builder-go:latest
+所有的都拉取
+/opt/mugen/testcases/package-test/OSS_FUZZ_NEW/oss-fuzz/projects
+软件包对应的Dockerfile编写
+ 
+From是需要构建软件包的基础镜像，
+
+ADD是添加本地文件到容器中
+COPY是将本地文件复制到容器中的某个目录下
+RUN是在容器中运行命令
+WORKDIR是用于设置容器内的工作目录
+
+第一：首先找到对应的软件包
+在/opt/mugen/testcases/package-test/OSS_FUZZ_NEW/oss-fuzz/projects/路径下查看对应的软件包
+2、修改dockerfile
+如果dockerfile中有从github社区拉源代码，需要修改成COPY 包名 $SRC/包名
+ 
+执行“python infra/helper.py build_fuzzers --clean --sanitizer address 包名”验证是否适配成功
+该命令是构建软件包镜像，确保镜像构建过程中无问题，同时会在/opt/mugen/testcases/package-test/OSS_FUZZ_NEW/oss-fuzz/log/该路径下对应的软件包中生成fuzzertarget，
+镜像构建完成后，运行run_fuzz接口
+python3 -u infra/helper.py run_fuzzer 包名 fuzz_cfg_parser -- -max_total_time=1800 -timeout=180
+fuzz_cfg_parser这个就是fuzzertarget里面的内容，
+
